@@ -1398,11 +1398,50 @@ export function render_active_connection(dev, with_link, hide_link_local) {
                 addr.indexOf("feb") === 0);
     }
 
+    function rfc5952_format(v6_addr) {
+        let fixed_addr = v6_addr;
+        // expand groups of zeros to make the addr easier to parse
+        let groups = v6_addr.split('::');
+        if (groups.length === 2) {
+            const groups_to_add = 8 - (groups[0].split(':').length + groups[1].split(':').length);
+            fixed_addr = groups[0] + ':';
+            for (let i = 0; i < groups_to_add; i++) {
+                fixed_addr = fixed_addr + '0000:';
+            }
+            fixed_addr = fixed_addr + groups[1];
+        }
+
+        // figure out the best spot to abbreviate with '::'
+        let best_len = 0; let best_pos = 0; let cur_len = 0; let start_pos;
+        groups = fixed_addr.split(':');
+        for (let i = 0; i < 8; i++) {
+            while (groups[i].charAt(0) === '0' && groups[i].length != 1) { groups[i] = groups[i].substring(1) }
+            if (groups[i] === '0') {
+                if (cur_len === 0) { start_pos = i }
+                cur_len++;
+                if (cur_len > best_len) {
+                    best_len = cur_len;
+                    best_pos = start_pos;
+                }
+            } else {
+                cur_len = 0;
+            }
+        }
+
+        if (best_len > 1) {
+            groups.splice(best_pos, best_len, '');
+        }
+
+        fixed_addr = groups.join(':');
+        fixed_addr = fixed_addr.toLowerCase();
+        return fixed_addr;
+    }
+
     const ip6config = con ? con.Ip6Config : dev.Ip6Config;
     if (ip6config) {
         ip6config.Addresses.forEach(function (a) {
             if (!(hide_link_local && is_ipv6_link_local(a[0])))
-                parts.push(a[0] + "/" + a[1]);
+                parts.push(rfc5952_format(a[0]) + "/" + a[1]);
         });
     }
 
